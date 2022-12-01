@@ -2,11 +2,12 @@ use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
 
 use eframe::{App, NativeOptions};
-use egui::{CentralPanel, Color32, Frame, Key, Pos2, Rect, Stroke, Ui, Vec2};
+use egui::{CentralPanel, Color32, Frame, Key, Rect, Ui, Vec2};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-const BOARD_SIZE: i16 = 30;
+const BOARD_WIDTH: i16 = 40;
+const BOARD_HEIGHT: i16 = 20;
 
 fn main() {
     eframe::run_native(
@@ -21,7 +22,7 @@ struct SnakeApp {
     direction: Direction,
     next_input: Option<Direction>,
     snake: VecDeque<Pos>,
-    board: [[bool; BOARD_SIZE as usize]; BOARD_SIZE as usize],
+    board: [[bool; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
     last_update: SystemTime,
     update_interval: Duration,
 }
@@ -112,7 +113,7 @@ impl SnakeApp {
             direction: Direction::Right,
             next_input: None,
             snake: VecDeque::from([Pos::new(5, 3), Pos::new(4, 3), Pos::new(3, 3)]),
-            board: [[false; BOARD_SIZE as usize]; BOARD_SIZE as usize],
+            board: [[false; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
             last_update: SystemTime::UNIX_EPOCH,
             update_interval: Duration::from_millis(100),
         }
@@ -155,7 +156,7 @@ impl SnakeApp {
             Direction::Left => Pos::new(old_head.x - 1, old_head.y),
         };
 
-        if !(0..BOARD_SIZE).contains(&new_head.x) || !(0..BOARD_SIZE).contains(&new_head.y) {
+        if !(0..BOARD_WIDTH).contains(&new_head.x) || !(0..BOARD_HEIGHT).contains(&new_head.y) {
             // lost
             *self = Self::new();
             return;
@@ -181,17 +182,16 @@ impl SnakeApp {
         let mut rng = rand::thread_rng();
         if rng.gen_bool(1.0 / 30.0) || apple_count == 0 {
             let mut options = Vec::new();
-            for y in 0..BOARD_SIZE {
-                for x in 0..BOARD_SIZE {
-                    let pos = Pos::new(y, x);
-                    if self.snake.contains(&pos) {
-                        continue;
-                    }
-                    if self.board[y as usize][x as usize] {
+            for (y, row) in self.board.iter().enumerate() {
+                for (x, &f) in row.iter().enumerate() {
+                    if f {
                         continue;
                     }
 
-                    options.push(pos);
+                    let pos = Pos::new(x as i16, y as i16);
+                    if !self.snake.contains(&pos) {
+                        options.push(pos);
+                    }
                 }
             }
 
@@ -203,49 +203,50 @@ impl SnakeApp {
 
     fn draw(&mut self, ui: &mut Ui) {
         let available_size = ui.available_size();
-        let board_size = available_size.x.min(available_size.y);
-        let board_x = (available_size.x - board_size) / 2.0;
-        let board_y = (available_size.y - board_size) / 2.0;
+        let field_size = {
+            let field_width = available_size.x / BOARD_WIDTH as f32;
+            let field_height = available_size.x / BOARD_HEIGHT as f32;
+            field_width.min(field_height)
+        };
 
-        let field_width = board_size / BOARD_SIZE as f32;
-        let field_height = board_size / BOARD_SIZE as f32;
-        let field_size = Vec2::new(field_width, field_height);
-
-        let board_pos = Pos2::new(board_x, board_y);
-        let board_size = Vec2::new(board_size, board_size);
+        let board_size = Vec2::new(
+            field_size * BOARD_WIDTH as f32,
+            field_size * BOARD_HEIGHT as f32,
+        );
+        let board_pos = ((available_size - board_size) / 2.0).to_pos2();
         let board_rect = Rect::from_min_size(board_pos, board_size);
 
         ui.allocate_ui_at_rect(board_rect, |ui| {
             let pos = ui.cursor().min;
             let board_rect = Rect::from_min_size(pos, board_size);
+            // println!("{_board_rect} {board_rect}");
             let painter = ui.painter_at(board_rect);
 
             // board
             painter.rect_filled(board_rect, 0.0, Color32::from_rgb(35, 30, 40));
 
             // apples
-            for y in 0..BOARD_SIZE {
-                for x in 0..BOARD_SIZE {
-                    if self.board[y as usize][x as usize] {
-                        let apple_pos =
-                            pos + Vec2::new(field_width * x as f32, field_height * y as f32);
-                        let rect = Rect::from_min_size(apple_pos, field_size);
-                        painter.rect_filled(rect, field_size.min_elem() / 2.0, Color32::RED);
+            for (y, row) in self.board.iter().enumerate() {
+                for (x, &f) in row.iter().enumerate() {
+                    if f {
+                        let apple_pos = pos + field_size * Vec2::new(x as f32, y as f32);
+                        let apple_rect = Rect::from_min_size(apple_pos, Vec2::splat(field_size));
+                        painter.rect_filled(apple_rect, field_size / 2.0, Color32::RED);
                     }
                 }
             }
 
             // snake
             for p in self.snake.iter() {
-                let tile_pos = pos + Vec2::new(field_width * p.x as f32, field_height * p.y as f32);
-                let rect = Rect::from_min_size(tile_pos, field_size);
-                painter.rect(rect, 0.0, Color32::from_rgb(90, 80, 200), Stroke::none());
+                let tile_pos = pos + field_size * Vec2::new(p.x as f32, p.y as f32);
+                let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
+                painter.rect_filled(tile_rect, 0.0, Color32::from_rgb(90, 80, 200));
             }
 
             // paused
             if self.paused {
                 let center_pos = pos + board_size / 2.0;
-                let entire_pause_size = board_size / 8.0;
+                let entire_pause_size = field_size * Vec2::new(2.4, 3.0);
 
                 let pause_rect_width = entire_pause_size.x / 3.0;
                 let pause_rect_size = Vec2::new(pause_rect_width, entire_pause_size.y);
