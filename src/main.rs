@@ -19,6 +19,7 @@ fn main() {
 struct SnakeApp {
     paused: bool,
     direction: Direction,
+    next_input: Option<Direction>,
     snake: VecDeque<Pos>,
     board: [[bool; BOARD_SIZE as usize]; BOARD_SIZE as usize],
     last_update: SystemTime,
@@ -56,42 +57,42 @@ impl App for SnakeApp {
             self.paused = !self.paused;
         }
 
-        // arrow keys
-        if ctx.input().key_pressed(Key::ArrowUp) && !(self.direction == Direction::Down) {
-            self.direction = Direction::Up;
-        } else if ctx.input().key_pressed(Key::ArrowRight) && !(self.direction == Direction::Left) {
-            self.direction = Direction::Right;
-        } else if ctx.input().key_pressed(Key::ArrowDown) && !(self.direction == Direction::Up) {
-            self.direction = Direction::Down;
-        } else if ctx.input().key_pressed(Key::ArrowLeft) && !(self.direction == Direction::Right) {
-            self.direction = Direction::Left;
-        }
+        if !self.paused {
+            // arrow keys
+            if ctx.input().key_pressed(Key::ArrowUp) {
+                self.up();
+            } else if ctx.input().key_pressed(Key::ArrowRight) {
+                self.right();
+            } else if ctx.input().key_pressed(Key::ArrowDown) {
+                self.down();
+            } else if ctx.input().key_pressed(Key::ArrowLeft) {
+                self.left();
+            }
 
-        // wasd keys
-        if ctx.input().key_pressed(Key::W) && !(self.direction == Direction::Down) {
-            self.direction = Direction::Up;
-        } else if ctx.input().key_pressed(Key::D) && !(self.direction == Direction::Left) {
-            self.direction = Direction::Right;
-        } else if ctx.input().key_pressed(Key::S) && !(self.direction == Direction::Up) {
-            self.direction = Direction::Down;
-        } else if ctx.input().key_pressed(Key::A) && !(self.direction == Direction::Right) {
-            self.direction = Direction::Left;
-        }
+            // wasd keys
+            if ctx.input().key_pressed(Key::W) {
+                self.up();
+            } else if ctx.input().key_pressed(Key::D) {
+                self.right();
+            } else if ctx.input().key_pressed(Key::S) {
+                self.down();
+            } else if ctx.input().key_pressed(Key::A) {
+                self.left();
+            }
 
-        // vim keys
-        if ctx.input().key_pressed(Key::K) && !(self.direction == Direction::Down) {
-            self.direction = Direction::Up;
-        } else if ctx.input().key_pressed(Key::L) && !(self.direction == Direction::Left) {
-            self.direction = Direction::Right;
-        } else if ctx.input().key_pressed(Key::J) && !(self.direction == Direction::Up) {
-            self.direction = Direction::Down;
-        } else if ctx.input().key_pressed(Key::H) && !(self.direction == Direction::Right) {
-            self.direction = Direction::Left;
-        }
+            // vim keys
+            if ctx.input().key_pressed(Key::K) {
+                self.up();
+            } else if ctx.input().key_pressed(Key::L) {
+                self.right();
+            } else if ctx.input().key_pressed(Key::J) {
+                self.down();
+            } else if ctx.input().key_pressed(Key::H) {
+                self.left();
+            }
 
-        if diff >= self.update_interval {
-            self.last_update = now;
-            if !self.paused {
+            if diff >= self.update_interval {
+                self.last_update = now;
                 self.update_state();
             }
         }
@@ -109,6 +110,7 @@ impl SnakeApp {
         Self {
             paused: true,
             direction: Direction::Right,
+            next_input: None,
             snake: VecDeque::from([Pos::new(5, 3), Pos::new(4, 3), Pos::new(3, 3)]),
             board: [[false; BOARD_SIZE as usize]; BOARD_SIZE as usize],
             last_update: SystemTime::UNIX_EPOCH,
@@ -116,7 +118,35 @@ impl SnakeApp {
         }
     }
 
+    fn up(&mut self) {
+        if !(self.direction == Direction::Down) {
+            self.next_input = Some(Direction::Up);
+        }
+    }
+
+    fn right(&mut self) {
+        if !(self.direction == Direction::Left) {
+            self.next_input = Some(Direction::Right);
+        }
+    }
+
+    fn down(&mut self) {
+        if !(self.direction == Direction::Up) {
+            self.next_input = Some(Direction::Down);
+        }
+    }
+
+    fn left(&mut self) {
+        if !(self.direction == Direction::Right) {
+            self.next_input = Some(Direction::Left);
+        }
+    }
+
     fn update_state(&mut self) {
+        if let Some(dir) = self.next_input {
+            self.direction = dir;
+        }
+
         let old_head = self.snake[0];
         let new_head = match self.direction {
             Direction::Up => Pos::new(old_head.x, old_head.y - 1),
