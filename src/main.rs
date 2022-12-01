@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
 
 use eframe::{App, NativeOptions};
-use egui::{CentralPanel, Color32, Key, Pos2, Rect, Stroke, Ui, Vec2};
+use egui::{CentralPanel, Color32, Frame, Key, Pos2, Rect, Stroke, Ui, Vec2};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
@@ -96,9 +96,11 @@ impl App for SnakeApp {
             }
         }
 
-        CentralPanel::default().show(ctx, |ui| {
-            self.draw(ui);
-        });
+        CentralPanel::default()
+            .frame(Frame::none().fill(Color32::from_rgb(20, 20, 20)))
+            .show(ctx, |ui| {
+                self.draw(ui);
+            });
     }
 }
 
