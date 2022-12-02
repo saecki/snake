@@ -2,10 +2,13 @@ use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
 
 use eframe::{App, NativeOptions};
-use egui::{CentralPanel, Color32, Frame, Key, Rect, Ui, Vec2};
+use egui::{
+    Align2, CentralPanel, Color32, FontFamily, FontId, Frame, Key, Pos2, Rect, RichText, Ui, Vec2,
+};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
+const START_LENGTH: usize = 3;
 const BOARD_WIDTH: i16 = 40;
 const BOARD_HEIGHT: i16 = 20;
 
@@ -48,6 +51,11 @@ impl Pos {
 }
 
 impl App for SnakeApp {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
+    }
+
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint();
 
@@ -264,6 +272,15 @@ impl SnakeApp {
                     Color32::from_rgba_unmultiplied(200, 200, 200, 40),
                 );
             }
+
+            let score = self.snake.len() - START_LENGTH;
+            painter.text(
+                pos + Vec2::splat(field_size * 0.5),
+                Align2::LEFT_TOP,
+                score.to_string(),
+                FontId::new(1.4 * field_size, FontFamily::Proportional),
+                Color32::LIGHT_GRAY,
+            );
         });
     }
 }
