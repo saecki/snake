@@ -185,16 +185,20 @@ impl SnakeApp {
         if score > 0 {
             self.scores.push(score);
             self.scores.sort_by(|a, b| b.cmp(a));
+            self.scores.truncate(10);
         }
         self.state = State::default();
         self.state.last_score = Some(score);
     }
 
     fn update_state(&mut self) {
+        let score = self.score() as f32;
         let state = &mut self.state;
         if let Some(dir) = state.next_input {
             state.direction = dir;
         }
+
+        state.update_interval = Duration::from_millis((100.0 * (35.0 / (score + 35.0))) as u64);
 
         let old_head = state.snake[0];
         let new_head = match state.direction {
@@ -226,7 +230,7 @@ impl SnakeApp {
         // place apple
         let apple_count = state.board.iter().flatten().filter(|f| **f).count();
         let mut rng = rand::thread_rng();
-        if rng.gen_bool(1.0 / 30.0) || apple_count == 0 {
+        if rng.gen_bool(state.update_interval.as_secs_f64() / 3.0) && apple_count < 10 || apple_count == 0 {
             let mut options = Vec::new();
             for (y, row) in state.board.iter().enumerate() {
                 for (x, &f) in row.iter().enumerate() {
