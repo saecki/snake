@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
 
 use eframe::{App, NativeOptions};
+use egui::color::Hsva;
 use egui::{Align2, CentralPanel, Color32, FontFamily, FontId, Frame, Key, Rect, Ui, Vec2};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -10,6 +11,13 @@ use serde::{Deserialize, Serialize};
 const START_LENGTH: usize = 3;
 const BOARD_WIDTH: i16 = 40;
 const BOARD_HEIGHT: i16 = 20;
+const SCORE_COLOR: [(usize, Color32); 5] = [
+    (5, Color32::from_rgb(90, 80, 200)),
+    (10, Color32::from_rgb(90, 200, 120)),
+    (20, Color32::from_rgb(250, 180, 80)),
+    (30, Color32::from_rgb(220, 40, 40)),
+    (50, Color32::from_rgb(240, 90, 200)),
+];
 
 fn main() {
     eframe::run_native(
@@ -49,7 +57,7 @@ impl Default for State {
             paused: true,
             direction: Direction::Right,
             next_input: None,
-            snake: VecDeque::from([Pos::new(5, 3), Pos::new(4, 3), Pos::new(3, 3)]),
+            snake: VecDeque::from_iter((0..START_LENGTH).rev().map(|i| Pos::new(2 + i as i16, 3))),
             board: [[false; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
             last_update: SystemTime::UNIX_EPOCH,
             update_interval: Duration::from_millis(100),
@@ -275,10 +283,26 @@ impl SnakeApp {
             }
 
             // snake
-            for p in self.state.snake.iter() {
+            let score = self.score();
+            let color = SCORE_COLOR
+                .iter()
+                .find_map(|(s, color)| (score < *s).then_some(color));
+
+            let time = SystemTime::now();
+            let duration = time.duration_since(SystemTime::UNIX_EPOCH).expect("what");
+            let frac = duration.subsec_millis() as f32 / 1000.0;
+            for (i, p) in self.state.snake.iter().enumerate() {
                 let tile_pos = pos + field_size * Vec2::new(p.x as f32, p.y as f32);
                 let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
-                painter.rect_filled(tile_rect, 0.0, Color32::from_rgb(90, 80, 200));
+
+                let color = match color {
+                    Some(c) => *c,
+                    None => {
+                        let hue = (frac + 0.01 * i as f32) % 1.0;
+                        Hsva::new(hue, 0.9, 0.8, 1.0).into()
+                    }
+                };
+                painter.rect_filled(tile_rect, 0.0, color);
             }
 
             if self.state.paused {
