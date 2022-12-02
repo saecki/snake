@@ -230,7 +230,9 @@ impl SnakeApp {
         // place apple
         let apple_count = state.board.iter().flatten().filter(|f| **f).count();
         let mut rng = rand::thread_rng();
-        if rng.gen_bool(state.update_interval.as_secs_f64() / 3.0) && apple_count < 10 || apple_count == 0 {
+        if apple_count == 0
+            || apple_count < 10 && rng.gen_bool(state.update_interval.as_secs_f64() / 3.0)
+        {
             let mut options = Vec::new();
             for (y, row) in state.board.iter().enumerate() {
                 for (x, &f) in row.iter().enumerate() {
@@ -279,9 +281,9 @@ impl SnakeApp {
             for (y, row) in self.state.board.iter().enumerate() {
                 for (x, &f) in row.iter().enumerate() {
                     if f {
-                        let apple_pos = pos + field_size * Vec2::new(x as f32, y as f32);
-                        let apple_rect = Rect::from_min_size(apple_pos, Vec2::splat(field_size));
-                        painter.rect_filled(apple_rect, field_size / 2.0, Color32::RED);
+                        let apple_pos =
+                            pos + field_size * Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+                        painter.circle_filled(apple_pos, 0.4 * field_size, Color32::RED)
                     }
                 }
             }
