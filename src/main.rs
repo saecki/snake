@@ -2,11 +2,10 @@ use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
 
 use eframe::{App, NativeOptions};
-use egui::{
-    Align2, CentralPanel, Color32, FontFamily, FontId, Frame, Key, Pos2, Rect, RichText, Ui, Vec2,
-};
+use egui::{Align2, CentralPanel, Color32, FontFamily, FontId, Frame, Key, Rect, Ui, Vec2};
 use rand::seq::SliceRandom;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 const START_LENGTH: usize = 3;
 const BOARD_WIDTH: i16 = 40;
@@ -16,11 +15,24 @@ fn main() {
     eframe::run_native(
         "snake",
         NativeOptions::default(),
-        Box::new(|_| Box::new(SnakeApp::new())),
+        Box::new(|c| {
+            Box::new(
+                c.storage
+                    .and_then(|s| eframe::get_value::<SnakeApp>(s, eframe::APP_KEY))
+                    .unwrap_or_default(),
+            )
+        }),
     )
 }
 
+#[derive(Default, Serialize, Deserialize)]
 struct SnakeApp {
+    scores: Vec<usize>,
+    #[serde(skip)]
+    state: State,
+}
+
+struct State {
     paused: bool,
     direction: Direction,
     next_input: Option<Direction>,
@@ -28,9 +40,25 @@ struct SnakeApp {
     board: [[bool; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
     last_update: SystemTime,
     update_interval: Duration,
+    last_score: Option<usize>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            paused: true,
+            direction: Direction::Right,
+            next_input: None,
+            snake: VecDeque::from([Pos::new(5, 3), Pos::new(4, 3), Pos::new(3, 3)]),
+            board: [[false; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
+            last_update: SystemTime::UNIX_EPOCH,
+            update_interval: Duration::from_millis(100),
+            last_score: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 enum Direction {
     Up = 0,
     Right = 1,
@@ -38,7 +66,7 @@ enum Direction {
     Left = 3,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 struct Pos {
     x: i16,
     y: i16,
@@ -55,18 +83,19 @@ impl App for SnakeApp {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint();
 
         let now = SystemTime::now();
-        let diff = now.duration_since(self.last_update).expect("Should be");
+        let diff = now
+            .duration_since(self.state.last_update)
+            .expect("Should be");
 
         if ctx.input().key_pressed(Key::Space) {
-            self.paused = !self.paused;
+            self.state.paused = !self.state.paused;
         }
 
-        if !self.paused {
+        if !self.state.paused {
             // arrow keys
             if ctx.input().key_pressed(Key::ArrowUp) {
                 self.up();
@@ -100,8 +129,8 @@ impl App for SnakeApp {
                 self.left();
             }
 
-            if diff >= self.update_interval {
-                self.last_update = now;
+            if diff >= self.state.update_interval {
+                self.state.last_update = now;
                 self.update_state();
             }
         }
@@ -115,49 +144,52 @@ impl App for SnakeApp {
 }
 
 impl SnakeApp {
-    fn new() -> Self {
-        Self {
-            paused: true,
-            direction: Direction::Right,
-            next_input: None,
-            snake: VecDeque::from([Pos::new(5, 3), Pos::new(4, 3), Pos::new(3, 3)]),
-            board: [[false; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
-            last_update: SystemTime::UNIX_EPOCH,
-            update_interval: Duration::from_millis(100),
-        }
-    }
-
     fn up(&mut self) {
-        if !(self.direction == Direction::Down) {
-            self.next_input = Some(Direction::Up);
+        if !(self.state.direction == Direction::Down) {
+            self.state.next_input = Some(Direction::Up);
         }
     }
 
     fn right(&mut self) {
-        if !(self.direction == Direction::Left) {
-            self.next_input = Some(Direction::Right);
+        if !(self.state.direction == Direction::Left) {
+            self.state.next_input = Some(Direction::Right);
         }
     }
 
     fn down(&mut self) {
-        if !(self.direction == Direction::Up) {
-            self.next_input = Some(Direction::Down);
+        if !(self.state.direction == Direction::Up) {
+            self.state.next_input = Some(Direction::Down);
         }
     }
 
     fn left(&mut self) {
-        if !(self.direction == Direction::Right) {
-            self.next_input = Some(Direction::Left);
+        if !(self.state.direction == Direction::Right) {
+            self.state.next_input = Some(Direction::Left);
         }
     }
 
+    fn score(&self) -> usize {
+        self.state.snake.len() - START_LENGTH
+    }
+
+    fn lost(&mut self) {
+        let score = self.score();
+        if score > 0 {
+            self.scores.push(score);
+            self.scores.sort_by(|a, b| b.cmp(a));
+        }
+        self.state = State::default();
+        self.state.last_score = Some(score);
+    }
+
     fn update_state(&mut self) {
-        if let Some(dir) = self.next_input {
-            self.direction = dir;
+        let state = &mut self.state;
+        if let Some(dir) = state.next_input {
+            state.direction = dir;
         }
 
-        let old_head = self.snake[0];
-        let new_head = match self.direction {
+        let old_head = state.snake[0];
+        let new_head = match state.direction {
             Direction::Up => Pos::new(old_head.x, old_head.y - 1),
             Direction::Right => Pos::new(old_head.x + 1, old_head.y),
             Direction::Down => Pos::new(old_head.x, old_head.y + 1),
@@ -165,46 +197,44 @@ impl SnakeApp {
         };
 
         if !(0..BOARD_WIDTH).contains(&new_head.x) || !(0..BOARD_HEIGHT).contains(&new_head.y) {
-            // lost
-            *self = Self::new();
+            self.lost();
             return;
         }
 
-        let eaten_apple = self.board[new_head.y as usize][new_head.x as usize];
+        let eaten_apple = state.board[new_head.y as usize][new_head.x as usize];
         if eaten_apple {
-            self.board[new_head.y as usize][new_head.x as usize] = false;
+            state.board[new_head.y as usize][new_head.x as usize] = false;
         } else {
-            self.snake.pop_back();
+            state.snake.pop_back();
         };
 
-        if self.snake.contains(&new_head) {
-            // lost
-            *self = Self::new();
+        if state.snake.contains(&new_head) {
+            self.lost();
             return;
         }
 
-        self.snake.push_front(new_head);
+        state.snake.push_front(new_head);
 
         // place apple
-        let apple_count = self.board.iter().flatten().filter(|f| **f).count();
+        let apple_count = state.board.iter().flatten().filter(|f| **f).count();
         let mut rng = rand::thread_rng();
         if rng.gen_bool(1.0 / 30.0) || apple_count == 0 {
             let mut options = Vec::new();
-            for (y, row) in self.board.iter().enumerate() {
+            for (y, row) in state.board.iter().enumerate() {
                 for (x, &f) in row.iter().enumerate() {
                     if f {
                         continue;
                     }
 
                     let pos = Pos::new(x as i16, y as i16);
-                    if !self.snake.contains(&pos) {
+                    if !state.snake.contains(&pos) {
                         options.push(pos);
                     }
                 }
             }
 
             if let Some(apple) = options.choose(&mut rng) {
-                self.board[apple.y as usize][apple.x as usize] = true;
+                state.board[apple.y as usize][apple.x as usize] = true;
             }
         }
     }
@@ -234,7 +264,7 @@ impl SnakeApp {
             painter.rect_filled(board_rect, 0.0, Color32::from_rgb(35, 30, 40));
 
             // apples
-            for (y, row) in self.board.iter().enumerate() {
+            for (y, row) in self.state.board.iter().enumerate() {
                 for (x, &f) in row.iter().enumerate() {
                     if f {
                         let apple_pos = pos + field_size * Vec2::new(x as f32, y as f32);
@@ -245,14 +275,14 @@ impl SnakeApp {
             }
 
             // snake
-            for p in self.snake.iter() {
+            for p in self.state.snake.iter() {
                 let tile_pos = pos + field_size * Vec2::new(p.x as f32, p.y as f32);
                 let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
                 painter.rect_filled(tile_rect, 0.0, Color32::from_rgb(90, 80, 200));
             }
 
-            // paused
-            if self.paused {
+            if self.state.paused {
+                // pause
                 let center_pos = pos + board_size / 2.0;
                 let entire_pause_size = field_size * Vec2::new(2.4, 3.0);
 
@@ -271,13 +301,44 @@ impl SnakeApp {
                     0.0,
                     Color32::from_rgba_unmultiplied(200, 200, 200, 40),
                 );
+
+                // high scores
+                if let Some(last) = self.state.last_score {
+                    painter.text(
+                        pos + Vec2::new((BOARD_WIDTH - 25) as f32 * field_size, field_size),
+                        Align2::LEFT_TOP,
+                        format!("You scored {last}"),
+                        FontId::new(1.4 * field_size, FontFamily::Proportional),
+                        Color32::LIGHT_GRAY,
+                    );
+                }
+
+                painter.text(
+                    pos + Vec2::new((BOARD_WIDTH - 10) as f32 * field_size, field_size),
+                    Align2::LEFT_TOP,
+                    "High scores",
+                    FontId::new(1.4 * field_size, FontFamily::Proportional),
+                    Color32::LIGHT_GRAY,
+                );
+                for (i, score) in self.scores.iter().enumerate() {
+                    painter.text(
+                        pos + Vec2::new(
+                            (BOARD_WIDTH - 10) as f32 * field_size,
+                            (i + 3) as f32 * 1.5 * field_size,
+                        ),
+                        Align2::LEFT_TOP,
+                        score.to_string(),
+                        FontId::new(1.4 * field_size, FontFamily::Proportional),
+                        Color32::LIGHT_GRAY,
+                    );
+                }
             }
 
-            let score = self.snake.len() - START_LENGTH;
+            // score
             painter.text(
                 pos + Vec2::splat(field_size * 0.5),
                 Align2::LEFT_TOP,
-                score.to_string(),
+                self.score().to_string(),
                 FontId::new(1.4 * field_size, FontFamily::Proportional),
                 Color32::LIGHT_GRAY,
             );
