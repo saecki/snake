@@ -242,7 +242,7 @@ impl SnakeApp {
         let apple_count = state.board.iter().flatten().filter(|f| **f).count();
         let mut rng = rand::thread_rng();
         if apple_count == 0
-            || apple_count < 10 && rng.gen_bool(state.update_interval.as_secs_f64() / 3.0)
+            || apple_count < 100 && rng.gen_bool(state.update_interval.as_secs_f64() / 0.5)
         {
             let mut options = Vec::new();
             for (y, row) in state.board.iter().enumerate() {
