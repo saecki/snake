@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use eframe::{App, NativeOptions};
 use egui::color::Hsva;
 use egui::{
-    Align2, CentralPanel, Color32, Context, FontFamily, FontId, Frame, Id, Key, Rect, Ui, Vec2,
+    Align2, CentralPanel, Color32, Context, FontFamily, FontId, Frame, Id, Key, Rect, Ui, Vec2, Stroke,
 };
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -331,7 +331,7 @@ impl SnakeApp {
                     let tile_pos =
                         pos + field_size * (interp * new_pos + (1.0 - interp) * last_pos);
                     let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
-                    painter.rect_filled(tile_rect, 0.0, color);
+                    painter.rect(tile_rect, 0.0, color, Stroke::new(1.0, color));
                 } else if i == self.state.snake.len() - 1 {
                     // animated tail
                     let p = self.state.last_tail_pos;
@@ -339,16 +339,16 @@ impl SnakeApp {
                     let tile_pos =
                         pos + field_size * (interp * new_pos + (1.0 - interp) * last_pos);
                     let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
-                    painter.rect_filled(tile_rect, 0.0, color);
+                    painter.rect(tile_rect, 0.0, color, Stroke::new(1.0, color));
 
                     // draw tail in new position so there is no gap
                     let tile_pos = pos + field_size * new_pos;
                     let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
-                    painter.rect_filled(tile_rect, 0.0, color);
+                    painter.rect(tile_rect, 0.0, color, Stroke::new(1.0, color));
                 } else {
                     let tile_pos = pos + field_size * new_pos;
                     let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
-                    painter.rect_filled(tile_rect, 0.0, color);
+                    painter.rect(tile_rect, 0.0, color, Stroke::new(1.0, color));
                 }
             }
 
