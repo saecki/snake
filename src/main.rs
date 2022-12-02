@@ -3,7 +3,9 @@ use std::time::{Duration, SystemTime};
 
 use eframe::{App, NativeOptions};
 use egui::color::Hsva;
-use egui::{Align2, CentralPanel, Color32, FontFamily, FontId, Frame, Key, Rect, Ui, Vec2};
+use egui::{
+    Align2, CentralPanel, Color32, Context, FontFamily, FontId, Frame, Id, Key, Rect, Ui, Vec2,
+};
 use rand::seq::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -45,10 +47,12 @@ struct State {
     direction: Direction,
     next_input: Option<Direction>,
     snake: VecDeque<Pos>,
+    last_tail_pos: Pos,
     board: [[bool; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
     last_update: SystemTime,
     update_interval: Duration,
     last_score: Option<usize>,
+    tick: u32,
 }
 
 impl Default for State {
@@ -58,10 +62,12 @@ impl Default for State {
             direction: Direction::Right,
             next_input: None,
             snake: VecDeque::from_iter((0..START_LENGTH).rev().map(|i| Pos::new(2 + i as i16, 3))),
+            last_tail_pos: Pos::new(1, 3),
             board: [[false; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
             last_update: SystemTime::UNIX_EPOCH,
             update_interval: Duration::from_millis(100),
             last_score: None,
+            tick: 1,
         }
     }
 }
@@ -139,7 +145,7 @@ impl App for SnakeApp {
 
             if diff >= self.state.update_interval {
                 self.state.last_update = now;
-                self.update_state();
+                self.update_state(ctx);
             }
         }
 
@@ -180,7 +186,7 @@ impl SnakeApp {
         self.state.snake.len() - START_LENGTH
     }
 
-    fn lost(&mut self) {
+    fn lost(&mut self, ctx: &Context) {
         let score = self.score();
         if score > 0 {
             self.scores.push(score);
@@ -189,16 +195,19 @@ impl SnakeApp {
         }
         self.state = State::default();
         self.state.last_score = Some(score);
+
+        ctx.clear_animations();
     }
 
-    fn update_state(&mut self) {
+    fn update_state(&mut self, ctx: &Context) {
         let score = self.score() as f32;
         let state = &mut self.state;
+
         if let Some(dir) = state.next_input {
             state.direction = dir;
         }
 
-        state.update_interval = Duration::from_millis((100.0 * (35.0 / (score + 35.0))) as u64);
+        state.update_interval = Duration::from_millis((200.0 * (20.0 / (score + 20.0))) as u64);
 
         let old_head = state.snake[0];
         let new_head = match state.direction {
@@ -209,9 +218,11 @@ impl SnakeApp {
         };
 
         if !(0..BOARD_WIDTH).contains(&new_head.x) || !(0..BOARD_HEIGHT).contains(&new_head.y) {
-            self.lost();
+            self.lost(ctx);
             return;
         }
+
+        state.last_tail_pos = *state.snake.back().unwrap();
 
         let eaten_apple = state.board[new_head.y as usize][new_head.x as usize];
         if eaten_apple {
@@ -221,7 +232,7 @@ impl SnakeApp {
         };
 
         if state.snake.contains(&new_head) {
-            self.lost();
+            self.lost(ctx);
             return;
         }
 
@@ -251,6 +262,8 @@ impl SnakeApp {
                 state.board[apple.y as usize][apple.x as usize] = true;
             }
         }
+
+        state.tick += 1;
     }
 
     fn draw(&mut self, ui: &mut Ui) {
@@ -289,6 +302,11 @@ impl SnakeApp {
             }
 
             // snake
+            let interp = ui.ctx().animate_value_with_time(
+                Id::new("snake"),
+                self.state.tick as f32,
+                self.state.update_interval.as_secs_f32(),
+            ) - self.state.tick.saturating_sub(1) as f32;
             let score = self.score();
             let color = SCORE_COLOR
                 .iter()
@@ -298,9 +316,6 @@ impl SnakeApp {
             let duration = time.duration_since(SystemTime::UNIX_EPOCH).expect("what");
             let frac = duration.subsec_millis() as f32 / 1000.0;
             for (i, p) in self.state.snake.iter().enumerate() {
-                let tile_pos = pos + field_size * Vec2::new(p.x as f32, p.y as f32);
-                let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
-
                 let color = match color {
                     Some(c) => *c,
                     None => {
@@ -308,7 +323,33 @@ impl SnakeApp {
                         Hsva::new(hue, 0.9, 0.8, 1.0).into()
                     }
                 };
-                painter.rect_filled(tile_rect, 0.0, color);
+                let new_pos = Vec2::new(p.x as f32, p.y as f32);
+                if i == 0 {
+                    // animated head
+                    let p = self.state.snake[i + 1];
+                    let last_pos = Vec2::new(p.x as f32, p.y as f32);
+                    let tile_pos =
+                        pos + field_size * (interp * new_pos + (1.0 - interp) * last_pos);
+                    let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
+                    painter.rect_filled(tile_rect, 0.0, color);
+                } else if i == self.state.snake.len() - 1 {
+                    // animated tail
+                    let p = self.state.last_tail_pos;
+                    let last_pos = Vec2::new(p.x as f32, p.y as f32);
+                    let tile_pos =
+                        pos + field_size * (interp * new_pos + (1.0 - interp) * last_pos);
+                    let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
+                    painter.rect_filled(tile_rect, 0.0, color);
+
+                    // draw tail in new position so there is no gap
+                    let tile_pos = pos + field_size * new_pos;
+                    let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
+                    painter.rect_filled(tile_rect, 0.0, color);
+                } else {
+                    let tile_pos = pos + field_size * new_pos;
+                    let tile_rect = Rect::from_min_size(tile_pos, Vec2::splat(field_size));
+                    painter.rect_filled(tile_rect, 0.0, color);
+                }
             }
 
             if self.state.paused {
