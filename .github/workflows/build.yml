@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - 'main'
+  schedule:
+  - cron:  '0 0 1 * *' # monthly
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - run: sudo apt-get update
+    - run: sudo apt-get install -y libxcb-shape0-dev libxcb-xfixes0-dev libssl-dev libgtk-3-dev
+
+    - uses: Swatinem/rust-cache@v1
+
+    - run: cargo build --release
+    - run: cargo test --release
+    - run: strip target/release/snake
+
+    - run: git config user.name "${GITHUB_ACTOR}"
+    - run: git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+    - run: git tag -fa nightly main -m ""
+    - run: git push --force origin nightly
+
+    - uses: softprops/action-gh-release@v0.1.14
+      with:
+        name: 'snake nightly'
+        body: 'Nightly build of snake'
+        tag_name: 'nightly'
+        fail_on_unmatched_files: true
+        files: |
+          target/release/snake
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+
+    - uses: Swatinem/rust-cache@v1
+
+    - run: cargo build --release
+    - run: cargo test --release
+    - run: strip target/release/snake.exe
+
+    - uses: softprops/action-gh-release@v0.1.14
+      with:
+        name: 'snake nightly'
+        body: 'Nightly build of snake'
+        tag_name: 'nightly'
+        fail_on_unmatched_files: true
+        files: |
+          target/release/snake.exe
