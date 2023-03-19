@@ -45,7 +45,7 @@ struct SnakeApp {
 struct State {
     paused: bool,
     direction: Direction,
-    next_input: Option<Direction>,
+    next_input: Option<(Direction, Option<Direction>)>,
     snake: VecDeque<Pos>,
     last_tail_pos: Pos,
     board: [[bool; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
@@ -80,6 +80,17 @@ enum Direction {
     Left = 3,
 }
 
+impl Direction {
+    fn opposite(&self) -> Self {
+        match self {
+            Self::Up => Self::Down,
+            Self::Right => Self::Left,
+            Self::Down => Self::Up,
+            Self::Left => Self::Right,
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 struct Pos {
     x: i16,
@@ -112,35 +123,35 @@ impl App for SnakeApp {
         if !self.state.paused {
             // arrow keys
             if ctx.input().key_pressed(Key::ArrowUp) {
-                self.up();
+                self.steer(Direction::Up);
             } else if ctx.input().key_pressed(Key::ArrowRight) {
-                self.right();
+                self.steer(Direction::Right);
             } else if ctx.input().key_pressed(Key::ArrowDown) {
-                self.down();
+                self.steer(Direction::Down);
             } else if ctx.input().key_pressed(Key::ArrowLeft) {
-                self.left();
+                self.steer(Direction::Left);
             }
 
             // wasd keys
             if ctx.input().key_pressed(Key::W) {
-                self.up();
+                self.steer(Direction::Up);
             } else if ctx.input().key_pressed(Key::D) {
-                self.right();
+                self.steer(Direction::Right);
             } else if ctx.input().key_pressed(Key::S) {
-                self.down();
+                self.steer(Direction::Down);
             } else if ctx.input().key_pressed(Key::A) {
-                self.left();
+                self.steer(Direction::Left);
             }
 
             // vim keys
             if ctx.input().key_pressed(Key::K) {
-                self.up();
+                self.steer(Direction::Up);
             } else if ctx.input().key_pressed(Key::L) {
-                self.right();
+                self.steer(Direction::Right);
             } else if ctx.input().key_pressed(Key::J) {
-                self.down();
+                self.steer(Direction::Down);
             } else if ctx.input().key_pressed(Key::H) {
-                self.left();
+                self.steer(Direction::Left);
             }
 
             if diff >= self.state.update_interval {
@@ -158,27 +169,18 @@ impl App for SnakeApp {
 }
 
 impl SnakeApp {
-    fn up(&mut self) {
-        if !(self.state.direction == Direction::Down) {
-            self.state.next_input = Some(Direction::Up);
-        }
-    }
-
-    fn right(&mut self) {
-        if !(self.state.direction == Direction::Left) {
-            self.state.next_input = Some(Direction::Right);
-        }
-    }
-
-    fn down(&mut self) {
-        if !(self.state.direction == Direction::Up) {
-            self.state.next_input = Some(Direction::Down);
-        }
-    }
-
-    fn left(&mut self) {
-        if !(self.state.direction == Direction::Right) {
-            self.state.next_input = Some(Direction::Left);
+    fn steer(&mut self, new_dir: Direction) {
+        match &mut self.state.next_input {
+            None => {
+                if self.state.direction != new_dir && self.state.direction != new_dir.opposite() {
+                    self.state.next_input = Some((new_dir, None))
+                }
+            }
+            Some((first, second)) => {
+                if second.is_none() && *first != new_dir.opposite() {
+                    *second = Some(new_dir);
+                }
+            }
         }
     }
 
@@ -203,8 +205,9 @@ impl SnakeApp {
         let score = self.score() as f32;
         let state = &mut self.state;
 
-        if let Some(dir) = state.next_input {
-            state.direction = dir;
+        if let Some((first, second)) = state.next_input {
+            state.direction = first;
+            state.next_input = second.map(|d| (d, None));
         }
 
         state.update_interval = Duration::from_millis((200.0 * (20.0 / (score + 20.0))) as u64);
