@@ -282,13 +282,35 @@ impl SnakeApp {
         let board_rect = Rect::from_min_size(board_pos, board_size);
 
         ui.allocate_ui_at_rect(board_rect, |ui| {
+            let score = self.score();
+            let frac = {
+                let time = SystemTime::now();
+                let duration = time.duration_since(SystemTime::UNIX_EPOCH).expect("what");
+                duration.subsec_millis() as f32 / 1000.0
+            };
+
             let pos = ui.cursor().min;
             let board_rect = Rect::from_min_size(pos, board_size);
-            // println!("{_board_rect} {board_rect}");
             let painter = ui.painter_at(board_rect);
 
             // board
-            painter.rect_filled(board_rect, 0.0, Color32::from_rgb(35, 30, 40));
+            if score < 70 {
+                painter.rect_filled(board_rect, 0.0, Color32::from_rgb(35, 30, 40));
+            } else {
+                const TILE_FRACTIONS: i16 = 4;
+                let tile_size = Vec2::splat(field_size / TILE_FRACTIONS as f32);
+                for x in 0..BOARD_WIDTH * TILE_FRACTIONS {
+                    for y in 0..BOARD_HEIGHT * TILE_FRACTIONS {
+                        let hue = (2.0 * frac + 0.001 * f32::sqrt((x as f32 + 10.0).powi(2) + (y as f32 + 10.0).powi(2))) % 1.0;
+                        let color = Hsva::new(hue, 0.9, 0.8, 1.0);
+                        
+                        let tile_pos = pos + tile_size * Vec2::new(x as f32, y as f32);
+                        let overlap = Vec2::splat(field_size / (TILE_FRACTIONS * 10) as f32);
+                        let tile_rect = Rect::from_min_size(tile_pos - overlap, tile_size + 2.0 * overlap);
+                        painter.rect_filled(tile_rect, 0.0, color);
+                    }
+                }
+            }
 
             // apples
             for (y, row) in self.state.board.iter().enumerate() {
@@ -307,14 +329,10 @@ impl SnakeApp {
                 self.state.tick as f32,
                 self.state.update_interval.as_secs_f32(),
             ) - self.state.tick.saturating_sub(1) as f32;
-            let score = self.score();
             let color = SCORE_COLOR
                 .iter()
                 .find_map(|(s, color)| (score < *s).then_some(color));
 
-            let time = SystemTime::now();
-            let duration = time.duration_since(SystemTime::UNIX_EPOCH).expect("what");
-            let frac = duration.subsec_millis() as f32 / 1000.0;
             for (i, p) in self.state.snake.iter().enumerate() {
                 let color = match color {
                     Some(c) => *c,
