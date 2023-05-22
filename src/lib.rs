@@ -8,7 +8,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 const START_LENGTH: usize = 3;
-const BOARD_WIDTH: i16 = 40;
+const BOARD_WIDTH: i16 = 64;
 const BOARD_HEIGHT: i16 = 20;
 const SCORE_COLOR: [(usize, Color32); 5] = [
     (5, Color32::from_rgb(90, 80, 200)),
@@ -159,6 +159,10 @@ impl Snake {
         }
     }
 
+    pub fn toggle_pause(&mut self) {
+        self.state.paused = !self.state.paused;
+    }
+
     fn score(&self) -> usize {
         self.state.snake.len() - START_LENGTH
     }
@@ -273,7 +277,7 @@ impl Snake {
 
             // board
             if score < 70 {
-                painter.rect_filled(board_rect, 0.0, Color32::from_rgb(35, 30, 40));
+                painter.rect_filled(board_rect, 0.0, Color32::from_gray(0x12));
             } else {
                 const TILE_FRACTIONS: i16 = 4;
                 let tile_size = Vec2::splat(field_size / TILE_FRACTIONS as f32);
@@ -300,7 +304,11 @@ impl Snake {
                     if f {
                         let apple_pos =
                             pos + field_size * Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
-                        painter.circle_filled(apple_pos, 0.4 * field_size, Color32::RED)
+                        painter.circle_filled(
+                            apple_pos,
+                            0.4 * field_size,
+                            Color32::from_rgb(0xff, 0x77, 0x33),
+                        )
                     }
                 }
             }
@@ -376,8 +384,8 @@ impl Snake {
                 // high scores
                 if let Some(last) = self.state.last_score {
                     painter.text(
-                        pos + Vec2::new((BOARD_WIDTH - 25) as f32 * field_size, field_size),
-                        Align2::LEFT_TOP,
+                        pos + Vec2::new((BOARD_WIDTH / 2) as f32 * field_size, 5.0 * field_size),
+                        Align2::CENTER_CENTER,
                         format!("You scored {last}"),
                         FontId::new(1.4 * field_size, FontFamily::Proportional),
                         Color32::LIGHT_GRAY,
@@ -385,16 +393,16 @@ impl Snake {
                 }
 
                 painter.text(
-                    pos + Vec2::new((BOARD_WIDTH - 10) as f32 * field_size, field_size),
+                    pos + Vec2::new(6.0 * field_size, 2.0 * field_size),
                     Align2::LEFT_TOP,
                     "High scores",
                     FontId::new(1.4 * field_size, FontFamily::Proportional),
                     Color32::LIGHT_GRAY,
                 );
-                for (i, score) in self.scores.iter().enumerate() {
+                for (i, score) in self.scores.iter().enumerate().take(10) {
                     painter.text(
                         pos + Vec2::new(
-                            (BOARD_WIDTH - 10) as f32 * field_size,
+                            6.0 * field_size,
                             (i + 3) as f32 * 1.5 * field_size,
                         ),
                         Align2::LEFT_TOP,
@@ -407,8 +415,8 @@ impl Snake {
 
             // score
             painter.text(
-                pos + Vec2::splat(field_size * 0.5),
-                Align2::LEFT_TOP,
+                pos + Vec2::new((BOARD_WIDTH as f32 - 0.5) * field_size, 0.5 * field_size),
+                Align2::RIGHT_TOP,
                 self.score().to_string(),
                 FontId::new(1.4 * field_size, FontFamily::Proportional),
                 Color32::LIGHT_GRAY,
