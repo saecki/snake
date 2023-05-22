@@ -15,6 +15,7 @@ fn main() {
             )
         }),
     )
+    .expect("error launching snake")
 }
 
 #[derive(Default, Serialize, Deserialize)]

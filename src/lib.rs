@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, SystemTime};
 
-use egui::color::Hsva;
+use egui::epaint::Hsva;
 use egui::{Align2, Color32, FontFamily, FontId, Id, Key, Rect, Stroke, Ui, Vec2};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -33,48 +33,50 @@ pub fn snake_game(ui: &mut Ui, snake: &mut Snake) {
         .duration_since(snake.state.last_update)
         .expect("Should be");
 
-    if ui.input().key_pressed(Key::Space) {
-        snake.state.paused = !snake.state.paused;
-    }
-
-    if !snake.state.paused {
-        // arrow keys
-        if ui.input().key_pressed(Key::ArrowUp) {
-            snake.steer(Direction::Up);
-        } else if ui.input().key_pressed(Key::ArrowRight) {
-            snake.steer(Direction::Right);
-        } else if ui.input().key_pressed(Key::ArrowDown) {
-            snake.steer(Direction::Down);
-        } else if ui.input().key_pressed(Key::ArrowLeft) {
-            snake.steer(Direction::Left);
+    ui.input(|i| {
+        if i.key_pressed(Key::Space) {
+            snake.state.paused = !snake.state.paused;
         }
 
-        // wasd keys
-        if ui.input().key_pressed(Key::W) {
-            snake.steer(Direction::Up);
-        } else if ui.input().key_pressed(Key::D) {
-            snake.steer(Direction::Right);
-        } else if ui.input().key_pressed(Key::S) {
-            snake.steer(Direction::Down);
-        } else if ui.input().key_pressed(Key::A) {
-            snake.steer(Direction::Left);
-        }
+        if !snake.state.paused {
+            // arrow keys
+            if i.key_pressed(Key::ArrowUp) {
+                snake.steer(Direction::Up);
+            } else if i.key_pressed(Key::ArrowRight) {
+                snake.steer(Direction::Right);
+            } else if i.key_pressed(Key::ArrowDown) {
+                snake.steer(Direction::Down);
+            } else if i.key_pressed(Key::ArrowLeft) {
+                snake.steer(Direction::Left);
+            }
 
-        // vim keys
-        if ui.input().key_pressed(Key::K) {
-            snake.steer(Direction::Up);
-        } else if ui.input().key_pressed(Key::L) {
-            snake.steer(Direction::Right);
-        } else if ui.input().key_pressed(Key::J) {
-            snake.steer(Direction::Down);
-        } else if ui.input().key_pressed(Key::H) {
-            snake.steer(Direction::Left);
-        }
+            // wasd keys
+            if i.key_pressed(Key::W) {
+                snake.steer(Direction::Up);
+            } else if i.key_pressed(Key::D) {
+                snake.steer(Direction::Right);
+            } else if i.key_pressed(Key::S) {
+                snake.steer(Direction::Down);
+            } else if i.key_pressed(Key::A) {
+                snake.steer(Direction::Left);
+            }
 
-        if diff >= snake.state.update_interval {
-            snake.state.last_update = now;
-            snake.update_state(ui);
+            // vim keys
+            if i.key_pressed(Key::K) {
+                snake.steer(Direction::Up);
+            } else if i.key_pressed(Key::L) {
+                snake.steer(Direction::Right);
+            } else if i.key_pressed(Key::J) {
+                snake.steer(Direction::Down);
+            } else if i.key_pressed(Key::H) {
+                snake.steer(Direction::Left);
+            }
         }
+    });
+
+    if !snake.state.paused && diff >= snake.state.update_interval {
+        snake.state.last_update = now;
+        snake.update_state(ui);
     }
 
     snake.draw(ui);
