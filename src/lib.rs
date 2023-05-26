@@ -11,7 +11,7 @@ const START_LENGTH: usize = 3;
 const BOARD_WIDTH: i16 = 64;
 const BOARD_HEIGHT: i16 = 20;
 const SCORE_COLOR: [(usize, Color32); 5] = [
-    (5, Color32::from_rgb(90, 80, 200)),
+    (5, Color32::from_rgb(110, 90, 220)),
     (10, Color32::from_rgb(90, 200, 120)),
     (20, Color32::from_rgb(250, 180, 80)),
     (30, Color32::from_rgb(220, 40, 40)),
