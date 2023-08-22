@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use eframe::{App, NativeOptions};
 use egui::{CentralPanel, Color32, Frame};
 use serde::{Deserialize, Serialize};
